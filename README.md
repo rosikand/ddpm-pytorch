@@ -5,9 +5,24 @@ This repo contains a work-in-progress implementation of [Denoising Diffusion Pro
 ## Usage 
 
 ```python
-diffuser = DDPM(model=Unet(dim=64), image_shape=(3, 32, 32), trainloader=trainloader, num_time_steps=1000, loss='mse')
+import ddpm_pytorch
+from ddpm_pytorch import diffusion
+
+diffuser = diffusion.DDPM(
+    model=Unet(dim=64), 
+    image_shape=(3, 32, 32), 
+    trainloader=trainloader, 
+    num_time_steps=1000, 
+    loss='mse'
+)
+
 diffuser.train(num_epochs=100)
-generated_image = diffuser.sample(model=diffuser.model, num_timesteps=1000, shape=(1,3,32,32))
+
+generated_image = diffuser.sample(
+    model=diffuser.model, 
+    num_timesteps=1000, 
+    shape=(1,3,32,32)
+)
 ```
 
 ## Installation
