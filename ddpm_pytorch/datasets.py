@@ -16,7 +16,7 @@ from glob import glob
 
 class DistDataset(Dataset):
 
-    def __init__(self, data_set, normalize=True, crop=None):
+    def __init__(self, data_set, normalize=True, crop=None, neg_one_normalize=True):
 
         self.data_distribution = data_set
         self.normalize = normalize
@@ -28,7 +28,10 @@ class DistDataset(Dataset):
 
         if self.normalize:
             sample = sample / 255.0
-        
+            
+            if neg_one_normalize:
+                sample = sample * 2 - 1
+                
         if self.crop is not None:
             sample = torchvision.transforms.CenterCrop(self.crop)(sample)
 
