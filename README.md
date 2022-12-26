@@ -20,7 +20,7 @@ diffuser.train(num_epochs=100)
 
 generated_image = diffuser.sample(
     model=diffuser.model, 
-    num_timesteps=1000, 
+    num_time_steps=1000, 
     shape=(1,3,32,32)
 )
 ```
