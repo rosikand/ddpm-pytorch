@@ -20,6 +20,7 @@ import rsbox
 from rsbox import ml, misc
 import torchvision 
 import os
+import wandb
 
 
 # ------------------------  (DDPM) ---------------------------------
@@ -36,6 +37,7 @@ class DDPM(experiment.Experiment):
         optimizer=None,
         variance_schedule=None,
         sample_every_n_epochs=1,
+        save_weights_every_n_epochs=10,
         device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
         logger=None
     ): 
@@ -59,7 +61,8 @@ class DDPM(experiment.Experiment):
         self.model.to(self.device)
         self.epoch_num = 0
         self.logger = logger
-        self.sample_every_n_epochs = sample_every_n_epochs  # int or None 
+        self.sample_every_n_epochs = sample_every_n_epochs  # int or None
+        self.save_weights_every_n_epochs = save_weights_every_n_epochs  # int or None 
 
 
         super().__init__(
@@ -172,7 +175,7 @@ class DDPM(experiment.Experiment):
 
 
     @torch.no_grad()
-    def sample(self, model, num_timesteps, shape, view_every=100, save_name=misc.timestamp(), return_intermediates=False):
+    def sample(self, model, num_time_steps, shape, view_every=100, save_name=misc.timestamp(), return_intermediates=False):
         # returns p_sample, i.e. the image after diffusion 
         # generates an image 
         
@@ -183,10 +186,15 @@ class DDPM(experiment.Experiment):
 
             saved_tensors = []
 
-            for i in tqdm(reversed(range(0, num_timesteps)), desc='sampling loop', total=num_timesteps):
+            for i in tqdm(reversed(range(0, num_time_steps)), desc='sampling loop', total=num_time_steps):
                 # save and plot 
-                if i % view_every == 0 or i == num_timesteps - 1:
+                if i % view_every == 0 or i == num_time_steps - 1:
                     saved_tensors.append(xt.cpu())
+
+
+                    if self.wandb_logger is not None:
+                        self.wandb_logger.log({save_name: wandb.Image(xt.cpu(), caption=f"step_{i}")})
+                
 
                 xt = self.p_sample_step(xt, model, i)
 
@@ -201,6 +209,14 @@ class DDPM(experiment.Experiment):
                 save_path = f"saved_samples/sample_{save_name}.png"
                 torchvision.utils.save_image(grid, save_path)
                 print(f"Saved sample to {save_path}")
+            
+
+            if self.wandb_logger is not None:
+                if self.epoch_num > 0:
+                    caption = "epoch_" + str(self.epoch_num)
+                else:
+                    caption = f"sample_{save_name}"
+                self.wandb_logger.log({"Generated sample": wandb.Image(grid, caption=caption)})
 
 
         if return_intermediates:
@@ -225,3 +241,9 @@ class DDPM(experiment.Experiment):
             save_path = "epoch_" + str(self.epoch_num) + "-" + misc.timestamp()
             self.sample(self.model, self.num_time_steps, (1, self.image_shape[-3], self.image_shape[-2], self.image_shape[-1]), view_every=200, save_name=save_path)
 
+        if self.save_weights_every_n_epochs is not None:
+            if self.epoch_num % self.save_weights_every_n_epochs == 0:
+                if not os.path.exists("saved"):
+                    os.makedirs("saved")
+                save_path = "saved/epoch_" + str(self.epoch_num) + "-" + misc.timestamp()
+                self.save_weights(save_path)

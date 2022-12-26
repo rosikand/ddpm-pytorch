@@ -12,7 +12,7 @@ def read_requirements_file(filename):
 
 
 setup(name='ddpm_pytorch',
-      version='0.0.3',
+      version='0.0.4',
       description='A minimal implementation of denoising diffusion probabilistic models in pytorch.',
       url='https://github.com/rosikand/ddpm-pytorch',
       author='Rohan Sikand',
