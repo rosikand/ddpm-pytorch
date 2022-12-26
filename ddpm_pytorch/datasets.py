@@ -16,13 +16,22 @@ from glob import glob
 
 class DistDataset(Dataset):
 
-    def __init__(self, data_set):
+    def __init__(self, data_set, normalize=True, crop=None):
 
         self.data_distribution = data_set
+        self.normalize = normalize
+        self.crop = crop
         
     def __getitem__(self, index):
         sample = self.data_distribution[index % len(self.data_distribution)]
         sample = torch.tensor(sample, dtype=torch.float)
+
+        if self.normalize:
+            sample = sample / 255.0
+        
+        if self.crop is not None:
+            sample = torchvision.transforms.CenterCrop(self.crop)(sample)
+
         return sample
         
     def __len__(self):
