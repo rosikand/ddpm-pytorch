@@ -16,7 +16,7 @@ from glob import glob
 
 class DistDataset(Dataset):
 
-    def __init__(self, data_set, normalize=True, resize=None, crop=None, neg_one_normalize=True, repeat_graysclale=False):
+    def __init__(self, data_set, normalize=True, resize=None, crop=None, neg_one_normalize=True, repeat_grayscale=False):
 
         self.data_distribution = data_set
         self.normalize = normalize
@@ -25,7 +25,7 @@ class DistDataset(Dataset):
         if self.neg_one_normalize and not self.normalize:
             raise ValueError("neg_one_normalize is set to True, but normalize is set to False. This is not allowed.")
         self.resize = resize 
-        self.repeat_grayscale = repeat_graysclale
+        self.repeat_grayscale = repeat_grayscale
 
         if self.resize is not None and self.crop is not None:
             assert self.resize >= self.crop, "resize must be larger than crop"
