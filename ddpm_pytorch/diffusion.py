@@ -35,7 +35,7 @@ class DDPM(experiment.Experiment):
         num_time_steps=1000,
         loss='mse',
         optimizer=None,
-        variance_schedule=None,
+        variance_schedule='linear',
         sample_every_n_epochs=1,
         save_weights_every_n_epochs=10,
         device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
@@ -43,7 +43,7 @@ class DDPM(experiment.Experiment):
     ): 
         self.model = model
         self.trainloader = trainloader
-        assert loss == 'mse' or loss == "l1", 'Only mse and l1 losses are supported. Please specify one of those two.'
+        assert loss == 'mse' or loss == "l1" or loss == 'huber' or loss == 'l2', 'Only mse, huber, l1, and l2 (mse) losses are supported. Please specify one of those as a string.'
         self.loss_str = loss
         if optimizer is None:
             self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
@@ -51,11 +51,7 @@ class DDPM(experiment.Experiment):
             self.optimizer = optimizer
         self.image_shape = image_shape
         self.num_time_steps = num_time_steps
-        if variance_schedule is None:
-            self.variance_schedule = self.linear_beta_schedule(self.num_time_steps)
-        else:
-            self.variance_schedule = variance_schedule
-
+        self.variance_schedule = self.get_variance_schedule(variance_schedule)
         self.precomputations = self.precompute_diffusion_variables()
         self.device = device
         self.model.to(self.device)
@@ -74,11 +70,56 @@ class DDPM(experiment.Experiment):
         )
 
 
+    def get_variance_schedule(self, variance_schedule_type):
+        if variance_schedule_type == 'linear':
+            return self.linear_beta_schedule(self.num_time_steps)
+        elif variance_schedule_type == 'cosine':
+            return self.cosine_beta_schedule(self.num_time_steps)
+        elif variance_schedule_type == 'quadratic':
+            return self.quadratic_beta_schedule(self.num_time_steps)
+        elif variance_schedule_type == 'sigmoid':
+            return self.sigmoid_beta_schedule(self.num_time_steps)
+        else:
+            raise ValueError('Only linear, cosine quadratic, and sigmoid variance schedules are supported. Please specify one of those as a string for variance_schedule.')
+
+
     def linear_beta_schedule(self, timesteps):
         # returns variance schedule 
         beta_start = 0.0001
         beta_end = 0.02
         return torch.linspace(beta_start, beta_end, timesteps)
+    
+
+    def cosine_beta_schedule(timesteps, s=0.008):
+        """
+        citation: https://huggingface.co/blog/annotated-diffusion#defining-the-forward-diffusion-process
+        cosine schedule as proposed in https://arxiv.org/abs/2102.09672
+        """
+        steps = timesteps + 1
+        x = torch.linspace(0, timesteps, steps)
+        alphas_cumprod = torch.cos(((x / timesteps) + s) / (1 + s) * torch.pi * 0.5) ** 2
+        alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+        betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+        return torch.clip(betas, 0.0001, 0.9999)
+
+
+    def quadratic_beta_schedule(timesteps):
+        """
+        citation: https://huggingface.co/blog/annotated-diffusion#defining-the-forward-diffusion-process
+        """
+        beta_start = 0.0001
+        beta_end = 0.02
+        return torch.linspace(beta_start**0.5, beta_end**0.5, timesteps) ** 2
+
+
+    def sigmoid_beta_schedule(timesteps):
+        """
+        citation: https://huggingface.co/blog/annotated-diffusion#defining-the-forward-diffusion-process
+        """
+        beta_start = 0.0001
+        beta_end = 0.02
+        betas = torch.linspace(-6, 6, timesteps)
+        return torch.sigmoid(betas) * (beta_end - beta_start) + beta_start
 
     
     def precompute_diffusion_variables(self):
@@ -93,7 +134,6 @@ class DDPM(experiment.Experiment):
         }
 
         return precomputations
-
 
 
     def forward_diffusion(self, x, timestep, noise_vector=None):
@@ -138,6 +178,10 @@ class DDPM(experiment.Experiment):
                 loss_val = F.mse_loss(noise_vector.float(), pred_noise)
             elif self.loss_str == 'l1':
                 loss_val = F.l1_loss(noise_vector.float(), pred_noise)
+            elif self.loss_str == 'l2':
+                loss_val = F.mse_loss(noise_vector.float(), pred_noise)
+            elif self.loss_str == 'huber':
+                loss_val = F.smooth_l1_loss(noise_vector.float(), pred_noise)
             batch_losses.append(loss_val)
 
         batch_loss = torch.mean(torch.stack(batch_losses))

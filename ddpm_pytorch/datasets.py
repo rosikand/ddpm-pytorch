@@ -21,6 +21,9 @@ class DistDataset(Dataset):
         self.data_distribution = data_set
         self.normalize = normalize
         self.crop = crop
+        self.neg_one_normalize = neg_one_normalize
+        if self.neg_one_normalize and not self.normalize:
+            raise ValueError("neg_one_normalize is set to True, but normalize is set to False. This is not allowed.")
         
     def __getitem__(self, index):
         sample = self.data_distribution[index % len(self.data_distribution)]
@@ -29,7 +32,7 @@ class DistDataset(Dataset):
         if self.normalize:
             sample = sample / 255.0
             
-            if neg_one_normalize:
+            if self.neg_one_normalize:
                 sample = sample * 2 - 1
                 
         if self.crop is not None:
@@ -53,12 +56,15 @@ class StreamingDataset(Dataset):
         extension: extension of images in directory
         crop: (int) size to center crop images to. None means no cropping.
     """
-    def __init__(self, dirpath, resize=None, normalize=True, extension="jpg", crop=None):
+    def __init__(self, dirpath, resize=None, normalize=True, extension="jpg", crop=None, neg_one_normalize=True):
         self.dirpath = dirpath
         self.img_paths = glob(self.dirpath + "/*." + extension)
         self.resize = resize
         self.normalize = normalize
         self.crop = crop
+        self.neg_one_normalize = neg_one_normalize
+        if self.neg_one_normalize and not self.normalize:
+            raise ValueError("neg_one_normalize is set to True, but normalize is set to False. This is not allowed.")
 
         
     def __getitem__(self, index):
@@ -66,6 +72,10 @@ class StreamingDataset(Dataset):
         sample = ml.load_image(sample_file, resize=self.resize, normalize=self.normalize)
 
         sample = torch.tensor(sample, dtype=torch.float)
+
+
+        if self.neg_one_normalize and self.normalize:
+            sample = sample * 2 - 1
 
         if self.crop is not None:
             sample = torchvision.transforms.CenterCrop(self.crop)(sample)
