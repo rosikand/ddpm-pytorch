@@ -222,6 +222,7 @@ class DDPM(experiment.Experiment):
     def sample(self, model, num_time_steps, shape, view_every=100, save_name=misc.timestamp(), return_intermediates=False):
         # returns p_sample, i.e. the image after diffusion 
         # generates an image 
+        # specify None to save_name to not save to file 
         
         model.to(self.device)
         with torch.no_grad():
@@ -244,7 +245,7 @@ class DDPM(experiment.Experiment):
 
 
             ims = torch.cat(saved_tensors, axis=0)
-            grid = torchvision.utils.make_grid(ims, nrow=3, padding=1, pad_value=1)
+            grid = torchvision.utils.make_grid(ims, nrow=5, padding=1, pad_value=1)
 
             if save_name is not None:
                 if not os.path.exists("saved_samples"):
@@ -264,7 +265,7 @@ class DDPM(experiment.Experiment):
 
 
         if return_intermediates:
-            return xt, saved_tensors
+            return xt, saved_tensors, grid
         else:
             return xt
 
