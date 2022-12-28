@@ -90,7 +90,7 @@ class DDPM(experiment.Experiment):
         return torch.linspace(beta_start, beta_end, timesteps)
     
 
-    def cosine_beta_schedule(timesteps, s=0.008):
+    def cosine_beta_schedule(self, timesteps, s=0.008):
         """
         citation: https://huggingface.co/blog/annotated-diffusion#defining-the-forward-diffusion-process
         cosine schedule as proposed in https://arxiv.org/abs/2102.09672
@@ -103,7 +103,7 @@ class DDPM(experiment.Experiment):
         return torch.clip(betas, 0.0001, 0.9999)
 
 
-    def quadratic_beta_schedule(timesteps):
+    def quadratic_beta_schedule(self, timesteps):
         """
         citation: https://huggingface.co/blog/annotated-diffusion#defining-the-forward-diffusion-process
         """
@@ -112,7 +112,7 @@ class DDPM(experiment.Experiment):
         return torch.linspace(beta_start**0.5, beta_end**0.5, timesteps) ** 2
 
 
-    def sigmoid_beta_schedule(timesteps):
+    def sigmoid_beta_schedule(self, timesteps):
         """
         citation: https://huggingface.co/blog/annotated-diffusion#defining-the-forward-diffusion-process
         """
