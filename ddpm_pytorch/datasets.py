@@ -84,7 +84,7 @@ class StreamingDataset(Dataset):
         extension: extension of images in directory
         crop: (int) size to center crop images to. None means no cropping.
     """
-    def __init__(self, dirpath, resize=None, normalize=True, extension="jpg", crop=None, neg_one_normalize=True, repeat_graysclale=False, dataset_multiplier=1):
+    def __init__(self, dirpath, resize=None, normalize=True, extension="jpg", crop=None, neg_one_normalize=True, repeat_grayscale=False, dataset_multiplier=1):
         self.dirpath = dirpath
         self.img_paths = glob(self.dirpath + "/*." + extension)
         self.resize = resize
@@ -93,7 +93,7 @@ class StreamingDataset(Dataset):
         self.neg_one_normalize = neg_one_normalize
         if self.neg_one_normalize and not self.normalize:
             raise ValueError("neg_one_normalize is set to True, but normalize is set to False. This is not allowed.")
-        self.repeat_grayscale = repeat_graysclale
+        self.repeat_grayscale = repeat_grayscale
         self.dataset_multiplier = dataset_multiplier
         
     def __getitem__(self, index):
