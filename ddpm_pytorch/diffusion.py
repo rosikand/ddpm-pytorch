@@ -7,7 +7,7 @@ Implements Denoising Diffusion Probabalistic Models.
 import numpy as np
 import torchplate
 from torchplate import (
-        experiment,
+        experiment,  # trainer 
         utils
     )
 from tqdm.auto import tqdm
@@ -165,7 +165,7 @@ class DDPM(experiment.Experiment):
                 
     
     def evaluate(self, batch):
-        # returns loss 
+        # returns loss for the trainer 
 
         batch_losses = []
         for x in batch:
@@ -213,9 +213,35 @@ class DDPM(experiment.Experiment):
         # posterior variance 
         sigma_t = beta * ((1 - alpha_prod_prev_t)/(1 - alpha_prod_t))
 
-        final = (one_over_alpha_t_sqrt * inner_result) + (sigma_t * z)
+        final = (one_over_alpha_t_sqrt * inner_result) + (torch.sqrt(sigma_t) * z)
 
         return final 
+
+    
+    @torch.no_grad()
+    def alt_p_sample_step(self, xt, model, timestep):
+        # alternate p_sample_step, which uses the mu parameterization (equation 11)
+
+        beta = self.variance_schedule[timestep]
+        alpha_t = self.precomputations["alphas"][timestep]
+        alpha_prod_t = self.precomputations["alpha_prod"][timestep]
+        alpha_prod_prev_t = self.precomputations["alpha_prod_prev"][timestep]
+        logits = model(xt, torch.tensor([timestep]).to(self.device))
+
+
+        alpha_t_sqrt_recp = 1/torch.sqrt(alpha_t)
+        model_mean = xt - ((beta / torch.sqrt(1 - alpha_prod_t)) * logits) 
+        model_std = torch.sqrt(beta * ((1. - alpha_prod_prev_t)/(1. - alpha_prod_t)))
+
+        if timestep == 0:
+            z_noise = 0.0
+        else:
+            z_noise = torch.randn_like(xt)
+        
+        x_t_minus_1 = (alpha_t_sqrt_recp * model_mean) + (model_std * z_noise)
+
+        return x_t_minus_1
+
 
 
     @torch.no_grad()
@@ -225,43 +251,43 @@ class DDPM(experiment.Experiment):
         # specify None to save_name to not save to file 
         
         model.to(self.device)
-        with torch.no_grad():
-            # start with pure gaussian noise 
-            xt = torch.randn(shape).to(self.device)
 
-            saved_tensors = []
+        # start with pure gaussian noise 
+        xt = torch.randn(shape).to(self.device)
 
-            for i in tqdm(reversed(range(0, num_time_steps)), desc='sampling loop', total=num_time_steps):
-                # save and plot 
-                if i % view_every == 0 or i == num_time_steps - 1:
-                    saved_tensors.append(xt.cpu())
+        saved_tensors = []
+
+        for i in tqdm(reversed(range(0, num_time_steps)), desc='sampling loop', total=num_time_steps):
+            # save and plot 
+            if i % view_every == 0 or i == num_time_steps - 1:
+                saved_tensors.append(xt.cpu())
 
 
-                    if self.wandb_logger is not None:
-                        self.wandb_logger.log({save_name: wandb.Image(xt.cpu(), caption=f"step_{i}")})
+                if self.wandb_logger is not None:
+                    self.wandb_logger.log({save_name: wandb.Image(xt.cpu(), caption=f"step_{i}")})
                 
+    
+            xt = self.alt_p_sample_step(xt, model, i)
 
-                xt = self.p_sample_step(xt, model, i)
 
+        ims = torch.cat(saved_tensors, axis=0)
+        grid = torchvision.utils.make_grid(ims, nrow=5, padding=1, pad_value=1)
 
-            ims = torch.cat(saved_tensors, axis=0)
-            grid = torchvision.utils.make_grid(ims, nrow=5, padding=1, pad_value=1)
+        if save_name is not None:
+            if not os.path.exists("saved_samples"):
+                os.makedirs("saved_samples")
 
-            if save_name is not None:
-                if not os.path.exists("saved_samples"):
-                    os.makedirs("saved_samples")
-
-                save_path = f"saved_samples/sample_{save_name}.png"
-                torchvision.utils.save_image(grid, save_path)
-                print(f"Saved sample to {save_path}")
+            save_path = f"saved_samples/sample_{save_name}.png"
+            torchvision.utils.save_image(grid, save_path)
+            print(f"Saved sample to {save_path}")
             
 
-            if self.wandb_logger is not None:
-                if self.epoch_num > 0:
-                    caption = "epoch_" + str(self.epoch_num)
-                else:
-                    caption = f"sample_{save_name}"
-                self.wandb_logger.log({"Generated sample": wandb.Image(grid, caption=caption)})
+        if self.wandb_logger is not None:
+            if self.epoch_num > 0:
+                caption = "epoch_" + str(self.epoch_num)
+            else:
+                caption = f"sample_{save_name}"
+            self.wandb_logger.log({"Generated sample": wandb.Image(grid, caption=caption)})
 
 
         if return_intermediates:
